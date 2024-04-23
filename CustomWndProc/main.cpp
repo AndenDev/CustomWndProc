@@ -15,8 +15,8 @@ WNDPROC originalWndProc = nullptr;
 bool KeyListener[256] = {};
 bool isCustomProcSet = false;
 bool isFirstCustomProcSet = false;
-bool wasInGame = false;
-
+bool setIngameOnce = false;
+bool setInlobbyOnce = false;
 
 DWORD sfModule = (DWORD)GetModuleHandle(0);
 DWORD GameBase_Address = sfModule + 0xC24F4C;
@@ -223,7 +223,7 @@ LRESULT __stdcall WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 HRESULT __stdcall Hooked_OBSPresent(LPDIRECT3DDEVICE9 pDevice, CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion)
 {
 	bool isInGame = InGame();
-	if (!isFirstCustomProcSet && !isInGame)
+	if (!isFirstCustomProcSet)
 	{
 		ResetCustomWndProc();
 		printf("First Setting custom WndProc for in-lobby.\n");
@@ -231,28 +231,33 @@ HRESULT __stdcall Hooked_OBSPresent(LPDIRECT3DDEVICE9 pDevice, CONST RECT* pSour
 		{
 			printf("Failed to set InLobby WndProc.\n");
 		}
-		isFirstCustomProcSet = true; 
+		isFirstCustomProcSet = true;
 	}
-	if (!wasInGame && isInGame) 
+	if (isFirstCustomProcSet)
 	{
-		ResetCustomWndProc();
-		printf("Setting custom WndProc for in-game.\n");
-		if (!SetCustomWndProc(pDevice, WndProc))
+		if (isInGame && !setIngameOnce)
 		{
-			printf("Failed to set InGame WndProc.\n");
+			ResetCustomWndProc();
+			printf("Setting custom WndProc for In-Game.\n");
+			if (!SetCustomWndProc(pDevice, WndProc))
+			{
+				printf("Failed to set In-Game WndProc.\n");
+			}
+			setIngameOnce = true;
+			setInlobbyOnce = false;
+		}
+		if (!isInGame && !setInlobbyOnce)
+		{
+			ResetCustomWndProc();
+			printf("Setting custom WndProc for In-Lobby.\n");
+			if (!SetCustomWndProc(pDevice, WndProc))
+			{
+				printf("Failed to set In-Lobby WndProc.\n");
+			}
+			setIngameOnce = false;
+			setInlobbyOnce = true;
 		}
 	}
-	else if (wasInGame && !isInGame) 
-	{
-		ResetCustomWndProc();
-		printf("Setting custom WndProc for in-lobby.\n");
-		if (!SetCustomWndProc(pDevice, WndProc))
-		{
-			printf("Failed to set InLobby WndProc.\n");
-		}
-	}
-
-	wasInGame = isInGame; // Update wasInGame for next iteration
 	return OrigPresent(pDevice, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
 }
 bool InitializeConsole()
